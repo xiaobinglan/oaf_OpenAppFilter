@@ -1,0 +1,37 @@
+name: Build OAF kernel module
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd git build-essential libncurses-dev flex bison
+      - name: Download and extract SDK
+        run: |
+          wget https://downloads.immortalwrt.org/snapshots/targets/qualcommax/ipq50xx/immortalwrt-sdk-qualcommax-ipq50xx_gcc-14.4.0_musl.Linux-x86_64.tar.zst
+          tar -I zstd -xf immortalwrt-sdk-qualcommax-ipq50xx_gcc-14.4.0_musl.Linux-x86_64.tar.zst
+          cd immortalwrt-sdk-qualcommax-ipq50xx_*
+          mv * ../
+          cd ..
+          rm -rf immortalwrt-sdk-qualcommax-ipq50xx_*
+      - name: Clone OAF
+        run: git clone https://github.com/destan19/OpenAppFilter.git package/oaf
+      - name: Update feeds
+        run: ./scripts/feeds update -a && ./scripts/feeds install -a
+      - name: Compile kmod-oaf
+        run: make package/oaf/compile V=s
+      - name: Extract oaf.ko
+        run: |
+          mkdir -p artifact
+          tar xzf bin/packages/aarch64_cortex-a53/oaf/kmod-oaf_*.ipk -C artifact/
+          find artifact -name "oaf.ko" -exec cp {} ./ \;
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oaf-ko
+          path: oaf.ko

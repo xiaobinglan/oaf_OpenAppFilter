@@ -27,13 +27,19 @@ jobs:
         working-directory: sdk
         run: ./scripts/feeds update -a && ./scripts/feeds install -a
 
-      - name: Prepare config
+      - name: Prepare config and enable kmod-oaf
         working-directory: sdk
         run: |
           export TERM=dumb
           if [ ! -f .config ]; then
             make defconfig
           fi
+          # 强制启用 OAF 内核模块及所需依赖
+          echo "CONFIG_PACKAGE_kmod-oaf=m" >> .config
+          echo "CONFIG_PACKAGE_appfilter=m" >> .config   # 可选，如果需要一起编译
+          echo "# CONFIG_KERNEL_NF_CONNTRACK_EVENTS is not set" >> .config   # 可能需要，按需
+          # 使配置生效
+          make defconfig
 
       - name: Compile kmod-oaf
         working-directory: sdk
@@ -41,12 +47,20 @@ jobs:
           export TERM=dumb
           make package/oaf/compile V=s
 
-      - name: Extract oaf.ko
+      - name: Find and extract oaf.ko
         working-directory: sdk
         run: |
+          # 先找出 kmod-oaf 生成的 ipk 文件
+          IPK=$(find bin -name "kmod-oaf_*.ipk" | head -1)
+          if [ -z "$IPK" ]; then
+            echo "Error: No kmod-oaf ipk found! Listing bin directory:"
+            find bin -type f
+            exit 1
+          fi
           mkdir -p ../artifact
-          tar xzf bin/packages/aarch64_cortex-a53/oaf/kmod-oaf_*.ipk -C ../artifact/
+          tar xzf "$IPK" -C ../artifact/
           find ../artifact -name "oaf.ko" -exec cp {} ./oaf.ko \;
+          echo "oaf.ko extracted successfully"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

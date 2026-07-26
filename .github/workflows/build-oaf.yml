@@ -27,9 +27,19 @@ jobs:
         working-directory: sdk
         run: ./scripts/feeds update -a && ./scripts/feeds install -a
 
+      - name: Prepare config
+        working-directory: sdk
+        run: |
+          export TERM=dumb
+          if [ ! -f .config ]; then
+            make defconfig
+          fi
+
       - name: Compile kmod-oaf
         working-directory: sdk
-        run: make package/oaf/compile V=s
+        run: |
+          export TERM=dumb
+          make package/oaf/compile V=s
 
       - name: Extract oaf.ko
         working-directory: sdk
